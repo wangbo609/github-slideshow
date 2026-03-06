@@ -79,9 +79,12 @@ qy       = data(:, 6);
 qz       = data(:, 7);
 qw       = data(:, 8);
 % Columns 9-11 are reference values from original data:
-ref_roll     =  data(:, 9);
-ref_pitch    = -data(:,10);  % stored as -pitch in the file
-ref_heading  = -data(:,11);  % stored as -heading in the file
+%   col9  = roll（真实横滚角）
+%   col10 = −pitch（负的真实俯仰角，需取反）
+%   col11 = −heading（负的真实航向角，需取反）
+ref_roll    =  data(:, 9);
+ref_pitch   = -data(:,10);   % 取反得到真实俯仰角
+ref_heading = -data(:,11);   % 取反得到真实航向角
 
 %% ---- Quaternion -> Euler angles (ZYX / aerospace convention) ----
 % Roll  (phi)   : rotation about X-axis
@@ -92,17 +95,33 @@ ref_heading  = -data(:,11);  % stored as -heading in the file
 %   roll    = atan2( 2*(qw*qx + qy*qz),  1 - 2*(qx^2 + qy^2) )
 %   pitch   = asin( 2*(qw*qy - qz*qx) )
 %   heading = atan2( 2*(qw*qz + qx*qy),  1 - 2*(qy^2 + qz^2) )
+%
+% 注意（符号约定）：
+%   由于该传感器采用特定坐标系约定，上述公式直接计算出的中间量等于
+%   数据文件中存储的原始列值，即：
+%     raw_pitch_deg   ≈ col10 = −pitch（负的真实俯仰角）
+%     raw_heading_deg ≈ col11 = −heading（负的真实航向角）
+%   因此，真实姿态角需对 pitch 和 heading 取反：
+%     真实 pitch   = −raw_pitch_deg
+%     真实 heading = −raw_heading_deg
 
-roll    = atan2(2*(qw.*qx + qy.*qz),  1 - 2*(qx.^2 + qy.^2));
-pitch   = asin( 2*(qw.*qy - qz.*qx) );
-heading = atan2(2*(qw.*qz + qx.*qy),  1 - 2*(qy.^2 + qz.^2));
+roll_rad    = atan2(2*(qw.*qx + qy.*qz),  1 - 2*(qx.^2 + qy.^2));
+raw_pitch   = asin( 2*(qw.*qy - qz.*qx) );
+raw_heading = atan2(2*(qw.*qz + qx.*qy),  1 - 2*(qy.^2 + qz.^2));
 
-% Convert radians to degrees
-roll_deg    = rad2deg(roll);
-pitch_deg   = rad2deg(pitch);
-heading_deg = rad2deg(heading);
+% 中间量（等于文件原始列，即 -pitch 和 -heading）
+raw_roll_deg    = rad2deg(roll_rad);
+raw_pitch_deg   = rad2deg(raw_pitch);
+raw_heading_deg = rad2deg(raw_heading);
 
-%% ---- Display results ----
+% 真实姿态角（度）
+% roll 符号正确，无需取反；pitch 和 heading 需取反
+roll_deg    =  raw_roll_deg;
+pitch_deg   = -raw_pitch_deg;       % 真实俯仰角
+heading_deg = -raw_heading_deg;     % 真实航向角
+
+%% ---- Display results (真实姿态角) ----
+% 注：roll 无需修正；pitch = -raw_pitch；heading = -raw_heading
 fprintf('%20s  %10s  %10s  %12s\n', 'Timestamp', 'Roll(deg)', 'Pitch(deg)', 'Heading(deg)');
 fprintf('%s\n', repmat('-', 1, 58));
 for i = 1:size(data, 1)
@@ -137,4 +156,4 @@ title('Heading: Quaternion-derived vs Reference');
 legend('From quaternion','Reference');
 grid on;
 
-sgtitle('Quaternion \rightarrow Euler Angles Conversion');
+sgtitle('四元数 \rightarrow 真实姿态角（已修正 pitch/heading 符号）');
